@@ -1,0 +1,297 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+.monitor{background:#0a0f1e;border-radius:12px;overflow:hidden;font-family:'Inter',sans-serif;width:100%;user-select:none;}
+.header{background:#0d1b2a;padding:8px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e3a5f;}
+.hfield{display:flex;flex-direction:column;align-items:center;}
+.hlabel{font-size:9px;color:#475569;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px;}
+.hval{font-size:11px;color:#94a3b8;font-weight:500;}
+.hval.time{color:#10b981;font-size:13px;font-weight:700;font-family:monospace;}
+.vitals{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding:8px;}
+.vcard{background:#111827;border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;justify-content:space-between;min-height:90px;border:1px solid #1e293b;}
+.vcard.alarm{border-color:#ef4444;animation:pulse-border 1s infinite;}
+@keyframes pulse-border{0%,100%{border-color:#ef4444;}50%{border-color:#7f1d1d;}}
+.vlabel{font-size:10px;color:#64748b;font-weight:500;text-transform:uppercase;letter-spacing:.04em;}
+.vvalue{font-size:28px;font-weight:700;line-height:1;margin:4px 0;}
+.vnormal{font-size:9px;color:#374151;}
+.vunit{font-size:11px;font-weight:400;}
+.v-green{color:#10b981;}
+.v-blue{color:#60a5fa;}
+.v-amber{color:#f59e0b;}
+.v-purple{color:#a78bfa;}
+.v-red{color:#ef4444;}
+.ecg-panel{margin:0 8px;background:#0d1b2a;border-radius:10px;border:1px solid #1e3a5f;overflow:hidden;}
+.ecg-header{display:flex;justify-content:space-between;padding:6px 12px;border-bottom:1px solid #1e3a5f;}
+.ecg-meta{font-size:10px;color:#64748b;}
+.ecg-meta span{color:#10b981;margin-left:4px;}
+canvas{display:block;width:100%;height:140px;}
+.bottom{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px;}
+.bpanel{background:#111827;border-radius:10px;border:1px solid #1e293b;padding:10px 12px;}
+.bpanel-title{font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;font-weight:600;}
+.trend-row{display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid #1e293b;}
+.trend-row:last-child{border-bottom:none;}
+.tname{font-size:11px;color:#94a3b8;}
+.tval{font-size:12px;font-weight:700;}
+.tline{flex:1;height:1px;background:#1e293b;margin:0 8px;position:relative;}
+.tline::after{content:'';position:absolute;left:0;top:0;width:70%;height:1px;background:#334155;}
+.qa-item{display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;}
+.qa-item:hover .qa-label{color:#e2e8f0;}
+.qa-icon{width:20px;height:20px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;}
+.qa-label{font-size:11px;color:#94a3b8;transition:color .15s;}
+.qa-rec{background:#1a2744;}
+.qa-gen{background:#1a2433;}
+.qa-exp{background:#1f1a2e;}
+.status-bar{background:#0d1b2a;padding:4px 16px;display:flex;gap:16px;align-items:center;border-top:1px solid #1e3a5f;}
+.status-dot{width:6px;height:6px;border-radius:50%;background:#10b981;animation:blink 2s infinite;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:.3;}}
+.status-text{font-size:10px;color:#475569;}
+.status-text span{color:#94a3b8;}
+.alarm-badge{background:#7f1d1d;color:#fca5a5;font-size:9px;padding:2px 6px;border-radius:3px;margin-left:auto;}
+.recording-dot{width:8px;height:8px;border-radius:50%;background:#ef4444;animation:blink .8s infinite;display:inline-block;margin-right:4px;}
+</style>
+
+<h2 class="sr-only">Live patient monitor display showing vital signs, ECG waveform, trend data, and quick actions</h2>
+
+<div class="monitor">
+  <div class="header">
+    <div class="hfield"><div class="hlabel">Patient ID</div><div class="hval">PT-004821</div></div>
+    <div class="hfield"><div class="hlabel">Name</div><div class="hval">Adebayo, K.</div></div>
+    <div class="hfield"><div class="hlabel">Age</div><div class="hval">34 yrs</div></div>
+    <div class="hfield"><div class="hlabel">Gender</div><div class="hval">Male</div></div>
+    <div class="hfield"><div class="hlabel">Room</div><div class="hval">ICU-07</div></div>
+    <div class="hfield"><div class="hlabel">Time</div><div class="hval time" id="clock">--:--:--</div></div>
+    <div class="hfield"><div class="hlabel">Date</div><div class="hval" id="datedisp">--/--/----</div></div>
+  </div>
+
+  <div class="vitals">
+    <div class="vcard">
+      <div class="vlabel">SpO₂</div>
+      <div class="vvalue v-green" id="spo2val">98<span class="vunit">%</span></div>
+      <div class="vnormal" style="color:#064e3b;">Normal: 95–100%</div>
+    </div>
+    <div class="vcard">
+      <div class="vlabel">Temperature</div>
+      <div class="vvalue v-blue" id="tempval">36.7<span class="vunit">°C</span></div>
+      <div class="vnormal" style="color:#1e3a5f;">Normal: 36.0–37.5°C</div>
+    </div>
+    <div class="vcard">
+      <div class="vlabel">EtCO₂</div>
+      <div class="vvalue v-amber" id="etco2val">34<span class="vunit">mmHg</span></div>
+      <div class="vnormal" style="color:#451a03;">Normal: 30–40 mmHg</div>
+    </div>
+    <div class="vcard">
+      <div class="vlabel">NIBP</div>
+      <div class="vvalue v-purple" style="font-size:22px;" id="nibpval">120/80</div>
+      <div class="vnormal" style="color:#2e1065;margin-top:2px;">MAP: <span style="color:#7c3aed;font-weight:600;">93</span> mmHg · Sys/Dia</div>
+    </div>
+    <div class="vcard" id="arrcard">
+      <div class="vlabel">Arrhythmia</div>
+      <div class="vvalue v-green" style="font-size:20px;" id="arrval">Normal</div>
+      <div class="vnormal" style="color:#064e3b;" id="arrnote">No arrhythmia detected ♥</div>
+    </div>
+  </div>
+
+  <div class="ecg-panel">
+    <div class="ecg-header">
+      <div class="ecg-meta">ECG Waveform<span>— Lead I</span></div>
+      <div class="ecg-meta">Gain: <span>10 mm/mV</span></div>
+      <div class="ecg-meta">Speed: <span>25 mm/s</span></div>
+      <div class="ecg-meta">HR: <span id="hrval">72</span> bpm</div>
+    </div>
+    <canvas id="ecgCanvas"></canvas>
+  </div>
+
+  <div class="bottom">
+    <div class="bpanel">
+      <div class="bpanel-title">Trend summary</div>
+      <div class="trend-row"><span class="tname">SpO₂ (%)</span><div class="tline"></div><span class="tval v-green" id="t-spo2">98</span></div>
+      <div class="trend-row"><span class="tname">Temp (°C)</span><div class="tline"></div><span class="tval v-blue" id="t-temp">36.7</span></div>
+      <div class="trend-row"><span class="tname">EtCO₂ (mmHg)</span><div class="tline"></div><span class="tval v-amber" id="t-etco2">34</span></div>
+      <div class="trend-row"><span class="tname">NIBP (mmHg)</span><div class="tline"></div><span class="tval v-purple" id="t-nibp">120/80</span></div>
+      <div class="trend-row"><span class="tname">Arrhythmia</span><div class="tline"></div><span class="tval v-green" id="t-arr">Normal</span></div>
+    </div>
+    <div class="bpanel">
+      <div class="bpanel-title">Quick actions</div>
+      <div class="qa-item" onclick="toggleRecord()">
+        <div class="qa-icon qa-rec"><i class="ti ti-player-record" style="color:#60a5fa;font-size:13px;" aria-hidden="true"></i></div>
+        <div class="qa-label" id="rec-label"><span class="recording-dot" id="recdot" style="display:none;"></span>Start / Stop recording</div>
+      </div>
+      <div class="qa-item" onclick="generateReport()">
+        <div class="qa-icon qa-gen"><i class="ti ti-file-description" style="color:#a78bfa;font-size:13px;" aria-hidden="true"></i></div>
+        <div class="qa-label" id="rep-label">Generate report</div>
+      </div>
+      <div class="qa-item" onclick="exportData()">
+        <div class="qa-icon qa-exp"><i class="ti ti-download" style="color:#f59e0b;font-size:13px;" aria-hidden="true"></i></div>
+        <div class="qa-label" id="exp-label">Export data</div>
+      </div>
+      <div style="margin-top:8px;padding-top:8px;border-top:1px solid #1e293b;display:flex;gap:6px;flex-wrap:wrap;">
+        <div style="font-size:9px;background:#0f2027;color:#475569;padding:3px 8px;border-radius:4px;cursor:pointer;" onclick="triggerAlarm()">Simulate alarm</div>
+        <div style="font-size:9px;background:#0f2027;color:#475569;padding:3px 8px;border-radius:4px;cursor:pointer;" onclick="clearAlarm()">Clear alarm</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="status-bar">
+    <div class="status-dot"></div>
+    <div class="status-text">Monitoring active · <span id="devtype">Bed-side unit</span></div>
+    <div class="status-text" style="margin-left:12px;">Network: <span style="color:#10b981;">Connected</span></div>
+    <div id="alarm-badge" class="alarm-badge" style="display:none;">⚠ ALARM ACTIVE</div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('ecgCanvas');
+const ctx = canvas.getContext('2d');
+let W, H, offset = 0, animId;
+let isRecording = false;
+let alarmActive = false;
+
+function resize() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  W = canvas.width = rect.width;
+  H = canvas.height = 140;
+}
+
+function ecgSegment(x) {
+  const cycle = 180;
+  const t = ((x % cycle) + cycle) % cycle;
+  if (t < 20) return Math.sin(t / 20 * Math.PI) * 8;
+  if (t < 30) return -Math.sin((t-20)/10 * Math.PI) * 5;
+  if (t < 40) return 0;
+  if (t < 45) return -12;
+  if (t < 50) return 55;
+  if (t < 55) return -18;
+  if (t < 65) return 0;
+  if (t < 80) return Math.sin((t-65)/15 * Math.PI) * 12;
+  return 0;
+}
+
+function drawECG() {
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#0d1b2a';
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.strokeStyle = '#1e3a5f';
+  ctx.lineWidth = 0.5;
+  for (let x = 0; x < W; x += 20) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+  for (let y = 0; y < H; y += 20) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+
+  const mid = H / 2;
+  ctx.strokeStyle = alarmActive ? '#ef4444' : '#10b981';
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  for (let x = 0; x <= W; x++) {
+    const y = mid - ecgSegment(x + offset);
+    x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  const now = new Date();
+  const baseMs = now.getTime();
+  for (let i = 0; i < 4; i++) {
+    const xpos = Math.round(W * i / 3);
+    const ms = new Date(baseMs - (3 - i) * 333);
+    const ts = `${String(ms.getHours()).padStart(2,'0')}:${String(ms.getMinutes()).padStart(2,'0')}:${String(ms.getSeconds()).padStart(2,'0')}`;
+    ctx.fillStyle = '#475569';
+    ctx.font = '9px monospace';
+    ctx.fillText(ts, xpos + 4, H - 4);
+  }
+  offset += 2;
+  animId = requestAnimationFrame(drawECG);
+}
+
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+  document.getElementById('datedisp').textContent =
+    `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()}`;
+}
+
+function jitter(base, range, decimals) {
+  const v = base + (Math.random() - 0.5) * range;
+  return decimals ? v.toFixed(decimals) : Math.round(v);
+}
+
+function updateVitals() {
+  if (alarmActive) return;
+  const spo2 = jitter(98, 1, 0);
+  const temp = jitter(36.7, 0.1, 1);
+  const etco2 = jitter(34, 2, 0);
+  const hr = jitter(72, 4, 0);
+  document.getElementById('spo2val').innerHTML = spo2 + '<span class="vunit">%</span>';
+  document.getElementById('tempval').innerHTML = temp + '<span class="vunit">°C</span>';
+  document.getElementById('etco2val').innerHTML = etco2 + '<span class="vunit">mmHg</span>';
+  document.getElementById('hrval').textContent = hr;
+  document.getElementById('t-spo2').textContent = spo2;
+  document.getElementById('t-temp').textContent = temp;
+  document.getElementById('t-etco2').textContent = etco2;
+}
+
+function toggleRecord() {
+  isRecording = !isRecording;
+  document.getElementById('recdot').style.display = isRecording ? 'inline-block' : 'none';
+  document.getElementById('rec-label').childNodes[document.getElementById('rec-label').childNodes.length-1].textContent = isRecording ? 'Recording...' : 'Start / Stop recording';
+}
+
+function generateReport() {
+  const lbl = document.getElementById('rep-label');
+  lbl.textContent = 'Generating report...';
+  lbl.style.color = '#a78bfa';
+  setTimeout(() => { lbl.textContent = 'Report ready ✓'; lbl.style.color = '#10b981'; }, 1200);
+  setTimeout(() => { lbl.textContent = 'Generate report'; lbl.style.color = ''; }, 3000);
+}
+
+function exportData() {
+  const lbl = document.getElementById('exp-label');
+  lbl.textContent = 'Exporting...';
+  lbl.style.color = '#f59e0b';
+  setTimeout(() => { lbl.textContent = 'Export complete ✓'; lbl.style.color = '#10b981'; }, 900);
+  setTimeout(() => { lbl.textContent = 'Export data'; lbl.style.color = ''; }, 2500);
+}
+
+function triggerAlarm() {
+  alarmActive = true;
+  document.getElementById('spo2val').innerHTML = '88<span class="vunit">%</span>';
+  document.getElementById('spo2val').className = 'vvalue v-red';
+  document.getElementById('arrval').textContent = 'A-Fib';
+  document.getElementById('arrval').className = 'vvalue v-red';
+  document.getElementById('arrnote').textContent = '⚠ Atrial fibrillation detected';
+  document.getElementById('arrnote').style.color = '#7f1d1d';
+  document.getElementById('arrcard').classList.add('alarm');
+  document.getElementById('alarm-badge').style.display = 'block';
+  document.getElementById('t-spo2').textContent = '88';
+  document.getElementById('t-spo2').className = 'tval v-red';
+  document.getElementById('t-arr').textContent = 'A-Fib';
+  document.getElementById('t-arr').className = 'tval v-red';
+}
+
+function clearAlarm() {
+  alarmActive = false;
+  document.getElementById('spo2val').innerHTML = '98<span class="vunit">%</span>';
+  document.getElementById('spo2val').className = 'vvalue v-green';
+  document.getElementById('arrval').textContent = 'Normal';
+  document.getElementById('arrval').className = 'vvalue v-green';
+  document.getElementById('arrnote').textContent = 'No arrhythmia detected ♥';
+  document.getElementById('arrnote').style.color = '#064e3b';
+  document.getElementById('arrcard').classList.remove('alarm');
+  document.getElementById('alarm-badge').style.display = 'none';
+  document.getElementById('t-spo2').textContent = '98';
+  document.getElementById('t-spo2').className = 'tval v-green';
+  document.getElementById('t-arr').textContent = 'Normal';
+  document.getElementById('t-arr').className = 'tval v-green';
+}
+
+resize();
+drawECG();
+updateClock();
+updateVitals();
+setInterval(updateClock, 1000);
+setInterval(updateVitals, 3000);
+window.addEventListener('resize', () => { resize(); });
+</script>
